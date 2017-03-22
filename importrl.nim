@@ -7,18 +7,20 @@ proc strValue(plist: plist_t): cstring =
   var str_value: cstring
   plist.plist_get_string_val(addr str_value)
   return str_value
+
+template getKeyStringValue(plist: plist_t, key: cstring): cstring =
+  if plist.plist_dict_get_item(key) == nil: nil
+  else: plist.plist_dict_get_item(key).strValue()
   
 iterator dictItems(plist: plist_t): tuple[key: cstring, value: plist_t] {.inline.} = 
   var plist_iter: plist_dict_iter
   plist.plist_dict_new_iter(addr plist_iter)
-  
   var key: cstring
   var value: plist_t
   plist.plist_dict_next_item(plist_iter, addr key, addr value)
   while (key != nil and value != nil):
     yield (key, value)
     plist.plist_dict_next_item(plist_iter, addr key, addr value)
-
 
 iterator arrayItems(plist: plist_t): plist_t {.inline.} =
   for index in 0..plist.plist_array_get_size():
@@ -45,18 +47,13 @@ if bookmarks_plist_path.fileExists():
   let elements = plist.plist_dict_get_item("Children")
   if elements != nil:
     for element in elements.arrayItems():
-      var found_reading_list = false
-      let title_plist = element.plist_dict_get_item("Title")
-      if title_plist != nil:
-        let title_value = title_plist.strValue()
-        found_reading_list = (title_value == "com.apple.ReadingList")
-      if found_reading_list:
+      if element.getKeyStringValue("Title") == "com.apple.ReadingList":
         saved_items = element
         break
 
   if saved_items != nil:
     let reading_list_elements = saved_items.plist_dict_get_item("Children")
     for reading_list_item in reading_list_elements.arrayItems():
-      for key, value in reading_list_item.dictItems():
-        if key == "URLString":
-          echo(value.strValue())
+      let urlstring = reading_list_item.getKeyStringValue("URLString")
+      if urlstring != nil:
+        echo(urlstring)
